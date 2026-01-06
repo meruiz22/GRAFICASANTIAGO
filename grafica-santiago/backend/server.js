@@ -32,12 +32,12 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customSiteTitle: 'Gráfica Santiago API'
 }));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/cart', cartRoutes);
-app.use('/api/orders', orderRoutes);
-// app.use('/api/reports', reportRoutes);
+// Rutas con prefijo de versión (Standard API)
+app.use('/api/v1/auth', authRoutes);     // Queda: /api/v1/login
+app.use('/api/v1', productRoutes);  // Queda: /api/v1/products
+app.use('/api/v1', cartRoutes);     // Queda: /api/v1/cart
+app.use('/api/v1', orderRoutes);    // Queda: /api/v1/order/new
+// app.use('/api/v1', reportRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
