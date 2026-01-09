@@ -1,24 +1,13 @@
 const express = require('express');
 const router = express.Router();
-
-// Importamos el controlador (asumiendo que el archivo es 'report.controller.js' como salió en tu error anterior)
-const ReportController = require('../controllers/report.controller');
-
-// Importamos seguridad (solo admins deberían ver reportes)
+const reportController = require('../controllers/report.controller');
 const { isAuthenticatedUser, authorizeRoles } = require('../middleware/auth.middleware');
 
-// Ruta para estadísticas del Dashboard
-router.route('/admin/dashboard').get(
-    isAuthenticatedUser, 
-    authorizeRoles('admin'), 
-    ReportController.getDashboardStats
-);
-
-// Ruta para gráfica de ventas
-router.route('/admin/sales').get(
-    isAuthenticatedUser, 
-    authorizeRoles('admin'), 
-    ReportController.getSalesChart
-);
+// Rutas de reportes (Solo Admin debería verlas)
+router.get('/sales', isAuthenticatedUser, authorizeRoles('admin'), reportController.getSalesReport);
+router.get('/best-sellers', isAuthenticatedUser, authorizeRoles('admin'), reportController.getBestSellers);
+router.get('/low-stock', isAuthenticatedUser, authorizeRoles('admin'), reportController.getLowStock);
+router.get('/top-customers', isAuthenticatedUser, authorizeRoles('admin'), reportController.getTopCustomers);
+router.get('/payment-methods', isAuthenticatedUser, authorizeRoles('admin'), reportController.getPaymentMethods);
 
 module.exports = router;
