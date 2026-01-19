@@ -13,7 +13,7 @@ import { Logo } from './components/Logo';
 // ==========================================
 // CONFIGURACIÓN API
 // ==========================================
-const API_URL = 'http://localhost:3000/api/v1'; 
+const API_URL = 'http://10.155.87.190:3000/api/v1'; 
 
 // ==========================================
 // 1. CONTEXTO (LOGIC LAYER)
