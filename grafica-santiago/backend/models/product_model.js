@@ -1,78 +1,52 @@
 const mongoose = require('mongoose');
 
-const reviewSchema = new mongoose.Schema(
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    },
-    nombre: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    rating: {
-      type: Number,
-      required: true,
-      min: 1,
-      max: 5
-    },
-    comentario: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 500
-    }
-  },
-  { timestamps: true }
-);
+
 
 const productSchema = new mongoose.Schema({
-  cod: {
-    type: String,
-    unique: true,
-    sparse: true,
-    trim: true
-  },
-
-  nombre: {
-    type: String,
-    required: [true, 'Nombre obligatorio'],
-    trim: true
-  },
-
-  descripcion: { type: String, default: '' },
-
-  // Frontend usa precio.minorista y precio.mayorista
-  precio: {
-    minorista: { type: Number, required: true, default: 0 },
-    mayorista: { type: Number, default: 0 }
-  },
-
-  stock: { type: Number, required: true, default: 0 },
-
-  categoria: { type: String, required: true, default: 'General' },
-
-  imagenes: [{
-    public_id: String,
-    url: String
-  }],
-
-  activo: { type: Boolean, default: true },
-
-  usuario: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'User',
-    required: false
-  },
-
-  // ⭐ Reseñas
-  reviews: [reviewSchema],
-  ratingPromedio: { type: Number, default: 0 },
-  numResenas: { type: Number, default: 0 },
-
-  createdAt: { type: Date, default: Date.now }
+  cod: { 
+        type: String, 
+        trim: true,
+        default: '' 
+    },
+    nombre: {
+        type: String,
+        required: [true, 'El nombre es obligatorio'],
+        trim: true
+    },
+    descripcion: {
+        type: String,
+        required: [true, 'La descripción es obligatoria']
+    },
+    precio: {
+        minorista: { type: Number, required: true },
+        mayorista: { type: Number, required: true }
+    },
+    stock: {
+        type: Number,
+        required: [true, 'El stock es obligatorio'],
+        default: 0
+    },
+    activo: {
+        type: Boolean,
+        default: true
+    },
+    categoria: {
+        type: String,
+        required: [true, 'La categoría es obligatoria'],
+        // enum: ['Papelería', 'Tecnología', 'Libros', 'Oficina', 'Arte', 'Otros', 'Cuadernos', 'Papel', 'Escritura']
+    },
+    imagenes: [
+        {
+            url: { type: String }
+        }
+    ],
+    fechaCreacion: {
+        type: Date,
+        default: Date.now
+    }
 });
+
+// 🔥 AQUÍ ES EL LUGAR CORRECTO (Después de crear el esquema, antes de exportar)
+productSchema.index({ stock: -1 });
 
 module.exports = mongoose.model('Product', productSchema);

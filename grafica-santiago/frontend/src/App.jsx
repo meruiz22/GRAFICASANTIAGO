@@ -1,11 +1,19 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { 
   ShoppingCart, Search, BarChart3, 
-  LogOut, Grid, TrendingUp, DollarSign, 
-  AlertCircle, CheckCircle, Clock, Trash2, Plus, X, User as UserIcon, Save,
-  Menu, ArrowRight, Star, Truck, Shield, Package,
-  Book, StickyNote, PenTool, Briefcase, Monitor, Backpack // Iconos para categorías
+  LogOut, Grid, DollarSign, 
+  Trash2, Plus, X, 
+  User as UserIcon, 
+  Users, // Icono usuarios
+  Menu, ArrowRight, Star, Package,
+  Book, StickyNote, PenTool, Briefcase, Monitor, Backpack,
+  FileText, Sheet // Iconos para PDF y Excel
 } from 'lucide-react';
+
+// Librerías de Reportes
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 // IMPORTAMOS TU LOGO (Asegúrate que exista el archivo)
 import { Logo } from './components/Logo';
@@ -13,7 +21,8 @@ import { Logo } from './components/Logo';
 // ==========================================
 // CONFIGURACIÓN API
 // ==========================================
-const API_URL = 'http://172.18.93.23:3000/api/v1';
+// ✅ Usamos localhost para evitar errores de IP
+const API_URL = 'http://localhost:3000/api/v1';
 
 // ==========================================
 // 1. CONTEXTO (LOGIC LAYER)
@@ -139,7 +148,7 @@ const getCategoryIcon = (catName) => {
   if (name.includes('oficina')) return Briefcase;
   if (name.includes('tecno') || name.includes('comput')) return Monitor;
   if (name.includes('escolar')) return Backpack;
-  return Package; // Default
+  return Package; 
 };
 
 // ==========================================
@@ -192,7 +201,6 @@ const AuthScreen = ({ onClose }) => {
 const Home = ({ setView, onCategorySelect }) => {
   const [categories, setCategories] = useState([]);
 
-  // Cargar categorías reales desde la base de datos
   useEffect(() => {
     fetch(`${API_URL}/categories`)
       .then(res => res.json())
@@ -281,7 +289,8 @@ const ProductList = ({ addToCart, selectedCategory, searchTerm }) => {
         <div className="text-center py-20">Cargando inventario...</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {products.map(p => (
+          {products?.length > 0 ? (
+             products.map(p => (
             <div key={p._id} className="bg-white rounded-3xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 group flex flex-col h-full">
               <div className="h-56 bg-gray-50 relative overflow-hidden">
                 <img src={p.imagenes?.[0]?.url || 'https://via.placeholder.com/300'} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" alt={p.nombre} />
@@ -308,13 +317,13 @@ const ProductList = ({ addToCart, selectedCategory, searchTerm }) => {
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-      )}
-      {!loading && products.length === 0 && (
-        <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-3xl">
-          <Package className="mx-auto text-gray-300 mb-4" size={48}/>
-          <p className="text-gray-500">No se encontraron productos.</p>
+          ))
+          ) : (
+            <div className="col-span-full text-center py-20 border-2 border-dashed border-gray-200 rounded-3xl">
+               <Package className="mx-auto text-gray-300 mb-4" size={48}/>
+               <p className="text-gray-500">No se encontraron productos.</p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -392,7 +401,7 @@ const Cart = ({ cart, removeFromCart, setView }) => {
   );
 };
 
-// --- PROFILE & ADMIN ---
+// --- PROFILE ---
 const ProfilePage = () => {
     const { user, updateProfile } = useAuth();
     const [formData, setFormData] = useState({ nombre: user?.nombre || '', email: user?.email || '', telefono: user?.telefono || '' });
@@ -422,31 +431,167 @@ const ProfilePage = () => {
     );
 };
 
-const AdminPanel = ({ token }) => {
-  const [stats, setStats] = useState(null);
-  useEffect(() => {
-    fetch(`${API_URL}/reports/summary`, { headers: { 'Authorization': `Bearer ${token}` } })
-      .then(res => res.json())
-      .then(data => { if(data.success) setStats(data.summary); });
-  }, []);
-  if (!stats) return <div className="p-8 text-center">Cargando...</div>;
-  return (
-    <div className="animate-fade-in space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard title="Ventas" value={`$${stats.totalSales.toFixed(2)}`} icon={DollarSign} color="bg-emerald-500" />
-        <StatCard title="Pedidos" value={stats.ordersCount} icon={Package} color="bg-blue-500" />
-        <StatCard title="Usuarios" value={stats.usersCount} icon={Users} color="bg-purple-500" />
-        <StatCard title="Productos" value={stats.productsCount} icon={Grid} color="bg-orange-500" />
-      </div>
-      <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm">
-        <h3 className="font-bold text-lg mb-6">Inventario Crítico</h3>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500 text-left"><tr><th className="p-3">Producto</th><th className="p-3">Stock</th></tr></thead>
-          <tbody>{stats.topStockProducts.map(p => (<tr key={p._id} className="border-b"><td className="p-3">{p.nombre}</td><td className="p-3 font-bold text-green-600">{p.stock}</td></tr>))}</tbody>
-        </table>
-      </div>
-    </div>
-  );
+// --- FORMULARIO NUEVO PRODUCTO (ADMIN/BODEGA) ---
+const ProductForm = ({ token, onCancel, onSuccess }) => {
+    const [formData, setFormData] = useState({
+        nombre: '', descripcion: '', precioMinorista: '', precioMayorista: '',
+        stock: '', categoria: 'Papelería', imagenUrl: ''
+    });
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            const body = {
+                nombre: formData.nombre,
+                descripcion: formData.descripcion,
+                precio: { minorista: Number(formData.precioMinorista), mayorista: Number(formData.precioMayorista) },
+                stock: Number(formData.stock),
+                categoria: formData.categoria,
+                imagenes: [{ url: formData.imagenUrl || 'https://via.placeholder.com/300' }]
+            };
+
+            const res = await fetch(`${API_URL}/admin/product/new`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (data.success) { alert('✅ Producto creado'); onSuccess(); }
+            else alert('Error: ' + data.message);
+        } catch (error) { alert('Error de conexión'); }
+    };
+
+    return (
+        <div className="bg-white p-8 rounded-3xl shadow-lg max-w-2xl mx-auto animate-fade-in">
+            <h2 className="text-2xl font-bold mb-6">Nuevo Producto</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <Input placeholder="Nombre del producto" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} required />
+                <Input placeholder="Descripción" value={formData.descripcion} onChange={e => setFormData({...formData, descripcion: e.target.value})} required />
+                <div className="grid grid-cols-2 gap-4">
+                    <Input type="number" placeholder="Precio Minorista ($)" value={formData.precioMinorista} onChange={e => setFormData({...formData, precioMinorista: e.target.value})} required />
+                    <Input type="number" placeholder="Precio Mayorista ($)" value={formData.precioMayorista} onChange={e => setFormData({...formData, precioMayorista: e.target.value})} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <Input type="number" placeholder="Stock Inicial" value={formData.stock} onChange={e => setFormData({...formData, stock: e.target.value})} required />
+                    <select className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white" value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})}>
+                        {['Papelería', 'Tecnología', 'Oficina', 'Escolar', 'Arte'].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                </div>
+                <Input placeholder="URL de la imagen (ej: https://...)" value={formData.imagenUrl} onChange={e => setFormData({...formData, imagenUrl: e.target.value})} />
+                
+                <div className="flex justify-end gap-3 mt-6">
+                    <Button type="button" variant="secondary" onClick={onCancel}>Cancelar</Button>
+                    <Button type="submit">Guardar Producto</Button>
+                </div>
+            </form>
+        </div>
+    );
+};
+
+// --- ADMIN & BODEGA PANEL ---
+const AdminPanel = ({ token, userRole }) => {
+    const [stats, setStats] = useState(null);
+    const [viewMode, setViewMode] = useState('dashboard'); // 'dashboard' o 'addProduct'
+    const [products, setProducts] = useState([]);
+
+    useEffect(() => {
+        // Solo cargar Stats si es ADMIN (Bodega no tiene permiso)
+        if (userRole === 'admin') {
+            fetch(`${API_URL}/reports/summary`, { headers: { 'Authorization': `Bearer ${token}` } })
+                .then(res => res.json()).then(data => { if(data.success) setStats(data.summary); });
+        }
+        
+        // Cargar Productos (Para reporte y para Bodega)
+        fetch(`${API_URL}/products?limit=1000`) 
+            .then(res => res.json()).then(data => { if(data.success) setProducts(data.products); });
+    }, [userRole]);
+
+    // 📄 EXPORTAR A EXCEL
+    const exportToExcel = () => {
+        const wb = XLSX.utils.book_new();
+        const prodData = products.map(p => ({
+            Código: p.cod, Nombre: p.nombre, Stock: p.stock, 
+            Precio: p.precio.minorista, Categoría: p.categoria
+        }));
+        const wsProd = XLSX.utils.json_to_sheet(prodData);
+        XLSX.utils.book_append_sheet(wb, wsProd, "Inventario");
+        XLSX.writeFile(wb, "Reporte_GraficaSantiago.xlsx");
+    };
+
+    // 📄 EXPORTAR A PDF
+    const exportToPDF = () => {
+        const doc = new jsPDF();
+        doc.text("Reporte de Inventario - Gráfica Santiago", 14, 20);
+        const tableColumn = ["Cód", "Nombre", "Stock", "Precio", "Categoría"];
+        const tableRows = products.map(p => [
+            p.cod, p.nombre, p.stock, `$${p.precio.minorista}`, p.categoria
+        ]);
+        doc.autoTable({ startY: 30, head: [tableColumn], body: tableRows });
+        doc.save("Reporte_Inventario.pdf");
+    };
+
+    if (viewMode === 'addProduct') {
+        return <ProductForm token={token} onCancel={() => setViewMode('dashboard')} onSuccess={() => setViewMode('dashboard')} />;
+    }
+
+    // Si es Admin y no carga stats, mostrar cargando. Si es Bodega, no espera stats.
+    if (userRole === 'admin' && !stats) return <div className="p-10 text-center">Cargando panel...</div>;
+
+    return (
+        <div className="animate-fade-in space-y-8">
+            <div className="flex justify-between items-center">
+                <h2 className="text-3xl font-bold">
+                    {userRole === 'bodega' ? '📦 Panel de Bodega' : '📊 Panel de Administración'}
+                </h2>
+                <div className="flex gap-2">
+                    {userRole === 'admin' && (
+                        <>
+                            <button onClick={exportToPDF} className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">
+                                <FileText size={18} /> PDF
+                            </button>
+                            <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                                <Sheet size={18} /> Excel
+                            </button>
+                        </>
+                    )}
+                    <Button onClick={() => setViewMode('addProduct')}>
+                        <Plus size={18} /> Nuevo Producto
+                    </Button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {(userRole === 'admin') && (
+                    <>
+                        <StatCard title="Ventas Totales" value={`$${stats?.totalSales.toFixed(2)}`} icon={DollarSign} color="bg-emerald-500" />
+                        <StatCard title="Pedidos" value={stats?.ordersCount} icon={Package} color="bg-blue-500" />
+                        <StatCard title="Usuarios" value={stats?.usersCount} icon={Users} color="bg-purple-500" />
+                        <StatCard title="Productos" value={stats?.productsCount} icon={Grid} color="bg-orange-500" />
+                    </>
+                )}
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm">
+                <h3 className="font-bold text-lg mb-6">Listado de Productos (Bodega/Admin)</h3>
+                <div className="overflow-auto max-h-96">
+                <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 text-gray-500 sticky top-0">
+                        <tr><th className="p-3">Producto</th><th className="p-3">Categoría</th><th className="p-3">Stock</th></tr>
+                    </thead>
+                    <tbody>
+                        {products.map(p => (
+                            <tr key={p._id} className="border-b hover:bg-gray-50">
+                                <td className="p-3">{p.nombre}</td>
+                                <td className="p-3 text-gray-500">{p.categoria}</td>
+                                <td className="p-3 font-bold text-green-600">{p.stock}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 const StatCard = ({ title, value, icon: Icon, color }) => (
@@ -464,7 +609,6 @@ export default function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [cart, setCart] = useState([]);
   
-  // Estado para filtros compartidos
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
 
@@ -478,7 +622,6 @@ export default function App() {
 
   const removeFromCart = (id) => setCart(prev => prev.filter(p => p._id !== id));
 
-  // Handler para navegar filtrando
   const handleCategorySelect = (cat) => {
     setSelectedCategory(cat);
     setView('products');
@@ -506,7 +649,6 @@ const AppContent = ({
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* NAVBAR */}
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-sm/50 backdrop-blur-md bg-white/80">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-10">
@@ -520,7 +662,6 @@ const AppContent = ({
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Buscador Rápido */}
             <div className="hidden md:flex items-center bg-gray-100 rounded-full px-4 py-2 w-64 border focus-within:border-[var(--color-gs-blue)] transition">
                 <Search className="w-4 h-4 text-gray-400 mr-2" />
                 <input 
@@ -541,7 +682,11 @@ const AppContent = ({
                 <div className="text-right hidden sm:block" onClick={() => setView('profile')}>
                   <p className="text-sm font-bold text-gray-900 cursor-pointer hover:underline">{user.nombre}</p>
                 </div>
-                {user.role === 'admin' && <button onClick={() => setView('admin')} className="p-2.5 bg-gray-100 rounded-full hover:bg-[var(--color-gs-yellow)] hover:text-[var(--color-gs-blue)] transition-colors"><BarChart3 size={20} /></button>}
+                {(user.role === 'admin' || user.role === 'bodega') && (
+                    <button onClick={() => setView('admin')} className="p-2.5 bg-gray-100 rounded-full hover:bg-[var(--color-gs-yellow)] hover:text-[var(--color-gs-blue)] transition-colors">
+                        <BarChart3 size={20} />
+                    </button>
+                )}
                 <button onClick={logout} className="p-2.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-colors"><LogOut size={20} /></button>
               </div>
             ) : <Button onClick={() => setShowAuth(true)} variant="dark" className="text-sm px-6">Ingresar</Button>}
@@ -549,16 +694,19 @@ const AppContent = ({
         </div>
       </nav>
 
-      {/* CONTENIDO */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
         {view === 'home' && <Home setView={setView} onCategorySelect={handleCategorySelect} />}
         {view === 'products' && <ProductList addToCart={addToCart} searchTerm={searchTerm} selectedCategory={selectedCategory} />}
         {view === 'cart' && <Cart cart={cart} removeFromCart={removeFromCart} setView={setView} />}
         {view === 'profile' && <ProfilePage />}
-        {view === 'admin' && <AdminPanel token={localStorage.getItem('grafica_user') ? JSON.parse(localStorage.getItem('grafica_user')).token : ''} />}
+        {view === 'admin' && (
+            <AdminPanel 
+                token={localStorage.getItem('grafica_user') ? JSON.parse(localStorage.getItem('grafica_user')).token : ''} 
+                userRole={user?.role} // 👈 ¡ESTO ES CRUCIAL!
+            />
+        )}
       </main>
 
-      {/* MODAL AUTH */}
       {showAuth && <AuthScreen onClose={() => setShowAuth(false)} />}
     </div>
   );

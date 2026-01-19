@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema({
     // ESTO ES LO IMPORTANTE PARA EL PANEL ADMIN:
     role: { 
         type: String, 
-        enum: ['user', 'admin'], 
+        enum: ['user', 'admin', 'bodega'],
         default: 'user' 
     },
     activo: { type: Boolean, default: true },

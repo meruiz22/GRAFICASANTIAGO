@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-
-const ReportController = require('../controllers/report.controller');
 const { isAuthenticatedUser, authorizeRoles } = require('../middleware/auth.middleware');
+const { getSummary } = require('../controllers/report.controller'); // Asegúrate que el controlador exista
 
-router.get('/summary', isAuthenticatedUser, authorizeRoles('admin'), ReportController.getSummary);
+// La ruta final será: /api/v1/reports/summary
+router.get('/summary', isAuthenticatedUser, authorizeRoles('admin'), getSummary);
 
 module.exports = router;

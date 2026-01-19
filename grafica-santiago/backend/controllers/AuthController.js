@@ -26,13 +26,14 @@ exports.register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'El email ya está registrado.' });
     }
 
-    const hashed = await bcrypt.hash(password, 10);
+    // ❌ BORRA O COMENTA ESTA LÍNEA (El modelo ya lo hace):
+    // const hashed = await bcrypt.hash(password, 10);
 
     const user = await User.create({
       nombre: nombre.trim(),
       apellido: apellido.trim(),
       email: email.toLowerCase().trim(),
-      password: hashed,
+      password: password, // ✅ ENVÍA LA CONTRASEÑA PLANA (El modelo la encriptará al guardar)
       telefono: telefono || '',
       cedulaRuc: cedulaRuc || '',
       role: 'user'
@@ -65,12 +66,16 @@ exports.login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email y password son obligatorios.' });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    // 🔥 AQUÍ ESTÁ EL CAMBIO: Agregamos .select('+password')
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
+
     if (!user) {
       return res.status(401).json({ success: false, message: 'Credenciales incorrectas.' });
     }
 
+    // Ahora user.password YA NO será undefined
     const ok = await bcrypt.compare(password, user.password);
+    
     if (!ok) {
       return res.status(401).json({ success: false, message: 'Credenciales incorrectas.' });
     }
