@@ -96,6 +96,35 @@ class OrderController {
 
 // INSTANCIA Y EXPORTACIÓN SEGURA
 const controller = new OrderController();
+exports.updateOrder = async (req, res, next) => {
+    try {
+        const order = await Order.findById(req.params.id);
+
+        if (!order) {
+            return res.status(404).json({ success: false, message: 'Pedido no encontrado' });
+        }
+
+        if (order.orderStatus === 'Entregado' && req.body.status !== 'Entregado') {
+            // Opcional: Impedir cambiar si ya estaba entregado, o permitirlo si fue error.
+            // Por ahora lo permitimos para flexibilidad.
+        }
+
+        order.orderStatus = req.body.status;
+
+        if (req.body.status === 'Entregado') {
+            order.deliveredAt = Date.now();
+        }
+
+        await order.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Estado del pedido actualizado'
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
 
 module.exports = {
     newOrder: (req, res, next) => controller.newOrder(req, res, next),

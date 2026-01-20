@@ -5,9 +5,9 @@ const {
     newOrder,
     getSingleOrder,
     myOrders,
-    allOrders,   // <--- Verifica que esto coincida con el controller
-    updateOrder, // <--- Verifica que esto coincida con el controller
-    deleteOrder  // <--- Verifica que esto coincida con el controller
+    allOrders,   
+    updateOrder, 
+    deleteOrder  
 } = require('../controllers/order.controller');
 
 const { isAuthenticatedUser, authorizeRoles } = require('../middleware/auth.middleware');
@@ -21,5 +21,6 @@ router.get('/orders/me', isAuthenticatedUser, myOrders);
 router.get('/admin/orders', isAuthenticatedUser, authorizeRoles('admin'), allOrders);
 router.put('/admin/order/:id', isAuthenticatedUser, authorizeRoles('admin'), updateOrder);
 router.delete('/admin/order/:id', isAuthenticatedUser, authorizeRoles('admin'), deleteOrder);
+router.put('/admin/order/:id', isAuthenticatedUser, authorizeRoles('admin'), updateOrder);
 
 module.exports = router;
