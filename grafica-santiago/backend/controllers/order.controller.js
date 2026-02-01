@@ -1,6 +1,6 @@
 const OrderRepository = require('../repositories/order.repository');
 const EmailService = require('../services/EmailService');
-
+const Notification = require('../models/notification_model');
 class OrderController {
     
     // 1. Crear nueva orden
@@ -76,6 +76,12 @@ class OrderController {
             }
 
             await order.save();
+            await Notification.create({
+        user: order.user,
+        mensaje: `Tu pedido #${order._id.toString().slice(-6)} ha cambiado a estado: ${req.body.status}`,
+        tipo: 'info'
+    });
+
             res.status(200).json({ success: true });
         } catch (error) {
             res.status(500).json({ success: false, message: error.message });

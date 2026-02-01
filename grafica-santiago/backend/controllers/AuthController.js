@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user_model');
+const Notification = require('../models/notification_model'); // 👈 1. IMPORTANTE: AGREGAR ESTO AQUÍ
 
 const signToken = (user) => {
   return jwt.sign(
@@ -165,8 +166,7 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// 👇 CAMBIAR ROL (Para ascender a Bodega/Admin)
-// 👇 CAMBIAR ROL (CON VERIFICACIÓN DE CONTRASEÑA)
+// 👇 CAMBIAR ROL (CON VERIFICACIÓN DE CONTRASEÑA Y NOTIFICACIÓN)
 exports.updateUserRole = async (req, res) => {
     try {
         const { id } = req.params; // ID del usuario al que vamos a cambiar
@@ -201,12 +201,20 @@ exports.updateUserRole = async (req, res) => {
 
         if (!user) return res.status(404).json({ success: false, message: "Usuario objetivo no encontrado" });
 
+        // 👇 2. AQUÍ LA NOTIFICACIÓN (ESTO FALTABA)
+        await Notification.create({
+            user: user._id,
+            mensaje: `Tu rol ha sido actualizado a: ${role.toUpperCase()}`,
+            tipo: 'warning'
+        });
+
         res.json({ success: true, message: `Rol actualizado a ${role}`, user });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
 // 👇 ELIMINAR USUARIO
 exports.deleteUser = async (req, res) => {
     try {
